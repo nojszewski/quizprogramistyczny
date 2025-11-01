@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quiz — wybór kategorii</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="card">
+    <h1>Quiz programistyczny</h1><br><br>
+  <!-- <div class="card-content"> -->
+  <header class="top">
+    <h2>Wybierz kategorię quizu</h2>
+  </header>
+
+    <form id="catForm">
+      <label class="field">
+        <select id="category" required>
+          <option value="" disabled selected>-- wybierz --</option>
+          <option>JavaScript</option>
+          <option>HTML</option>
+          <option>CSS</option>
+          <option>Python</option>
+          <option>DevOps</option>
+        </select>
+      </label><br><br>
+      <div class="row">
+        <button type="submit" class="btn">Rozpocznij</button>
+        <a class="btn ghost" href="history.html">Historia</a>
+      </div>
+    </form>
+  <!-- </div> -->
+</main>
+<script src="script.js"></script>
+</body>
+</html>
