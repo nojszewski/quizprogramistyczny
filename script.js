@@ -2,65 +2,65 @@ const API = {
   gen: 'http://100.82.179.61:5678/webhook/generuj-pytanie',
   save: 'http://100.82.179.61:5678/webhook/zapisz-odpowiedz',
   history: 'http://100.82.179.61:5678/webhook/pobierz-historie-odpowiedzi'
+};
+
+// ========== API ==========
+async function fetchJSON(url, options = {}) {
+  const r = await fetch(url, options);
+  if (!r.ok) throw new Error(`fetch fail: ${r.status}`);
+  return r.json();
 }
 
 async function fetchQuestion(category) {
+  const body = JSON.stringify({ chatInput: category });
   try {
-    const r = await fetch(API.gen, {
+    return await fetchJSON(API.gen, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ chatInput: category })
-    })
-    if (!r.ok) throw new Error('POST gen fail')
-    const j = await r.json()
-    return j
-  } catch (e) {
+      body
+    });
+  } catch {
     const q = encodeURIComponent(category);
-    const r = await fetch(API.gen + '?chatInput=' + q)
-    return r.json()
+    return fetchJSON(`${API.gen}?chatInput=${q}`);
   }
 }
 
 async function postSave(payload) {
-  const r = await fetch(API.save, {
+  return fetchJSON(API.save, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(payload)
-  })
-  return r.ok ? r.json().catch(()=>null) : Promise.reject(await r.text())
+  }).catch(() => null);
 }
 
-
-if (document.getElementById('catForm')) {
-  const form = document.getElementById('catForm')
-  form.addEventListener('submit', e => {
-    e.preventDefault()
-    const cat = document.getElementById('category').value
-    if (!cat) return
-    sessionStorage.setItem('quizCategory', cat)
-    const init = { round: 1, correct: 0, answers: [] }
-    sessionStorage.setItem('quizState', JSON.stringify(init))
-    location.href = 'quiz.html'
-  })
+// ========== STRONA GŁÓWNA ==========
+const catForm = document.getElementById('catForm');
+if (catForm) {
+  catForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const cat = document.getElementById('category').value.trim();
+    if (!cat) return;
+    sessionStorage.setItem('quizCategory', cat);
+    sessionStorage.setItem('quizState', JSON.stringify({ round: 1, correct: 0, answers: [] }));
+    location.href = 'quiz.html';
+  });
 }
 
+// ========== QUIZ ==========
+const answersForm = document.getElementById('answersForm');
+if (answersForm) {
+  const catTitle = document.getElementById('catTitle');
+  const roundEl = document.getElementById('round');
+  const questionEl = document.getElementById('pytanie');
+  const submitBtn = document.getElementById('submitBtn');
+  const msg = document.getElementById('msg');
 
+  const category = sessionStorage.getItem('quizCategory') || '';
+  let quizState = JSON.parse(sessionStorage.getItem('quizState') || '{"round":1,"correct":0,"answers":[]}');
+  let currentQuestion = null;
 
-if (document.getElementById('answersForm')) {
-  const catTitle = document.getElementById('catTitle')
-  const roundEl = document.getElementById('round')
-  const questionEl = document.getElementById('pytanie')
-  const answersForm = document.getElementById('answersForm')
-  const submitBtn = document.getElementById('submitBtn')
-  const msg = document.getElementById('msg')
-
-  let quizState = JSON.parse(sessionStorage.getItem('quizState') || '{"round":1,"correct":0,"answers":[]}')
-  const category = sessionStorage.getItem('quizCategory') || ''
-
-  catTitle.textContent = category || '—'
-  roundEl.textContent = quizState.round
-
-  let currentQuestion = null
+  catTitle.textContent = category || '—';
+  roundEl.textContent = quizState.round;
 
   async function loadQuestion() {
     msg.textContent = '';
@@ -70,88 +70,62 @@ if (document.getElementById('answersForm')) {
 
     try {
       const data = await fetchQuestion(category);
-
-      const item = Array.isArray(data) ? data[0] : data;
-      const out = item.output || item;
-      currentQuestion = out;
-      renderQuestion(out);
+      const q = (Array.isArray(data) ? data[0] : data).output || data;
+      currentQuestion = q;
+      renderQuestion(q);
       submitBtn.disabled = false;
-    } catch (err) {
+    } catch {
       questionEl.textContent = 'Błąd pobierania pytania';
-      msg.textContent = String(err);
     }
   }
 
   function renderQuestion(q) {
     questionEl.textContent = q.pytanie || 'Brak treści';
-    const opts = [
-      {k:'A', t:q.odpA || ''},
-      {k:'B', t:q.odpB || ''},
-      {k:'C', t:q.odpC || ''},
-      {k:'D', t:q.odpD || ''},
-    ];
-
     answersForm.innerHTML = '';
-
-    opts.forEach(o => {
+    ['A','B','C','D'].forEach(k => {
       const label = document.createElement('label');
       label.className = 'answer';
-
-      const input = document.createElement('input');
-      input.name = 'ans';
-      input.type = 'radio';
-      input.value = o.k;
-      input.required = true;
-
-      const div = document.createElement('div');
-      div.textContent = `${o.k}. ${o.t}`;
-
-      label.appendChild(input);
-      label.appendChild(div);
+      label.innerHTML = `
+        <input type="radio" name="ans" value="${k}" required>
+        <div>${k}. ${q['odp' + k] || ''}</div>`;
       answersForm.appendChild(label);
     });
   }
 
   submitBtn.addEventListener('click', async () => {
     const sel = answersForm.querySelector('input[name="ans"]:checked');
-    if (!sel) { msg.textContent = 'Wybierz odpowiedź'; return; }
-    const userAns = sel.value;
+    if (!sel) return (msg.textContent = 'Wybierz odpowiedź');
 
-    const correct = (currentQuestion.poprawnaOdp || '').toString().toUpperCase();
+    const userAns = sel.value;
+    const correct = (currentQuestion.poprawnaOdp || '').toUpperCase();
     const isCorrect = userAns === correct;
+    msg.textContent = 'Zapis...';
+    submitBtn.disabled = true;
 
     const payload = {
-      pytanie: currentQuestion.pytanie,
-      odpA: currentQuestion.odpA,
-      odpB: currentQuestion.odpB,
-      odpC: currentQuestion.odpC,
-      odpD: currentQuestion.odpD,
+      ...currentQuestion,
       poprawnaOdp: correct,
       odpowiedz_usera: userAns,
-      kategoria: sessionStorage.getItem('quizCategory') || ''
+      kategoria: category
     };
-    submitBtn.disabled = true;
-    msg.textContent = 'Zapis...';
 
     try {
       await postSave(payload);
-
       quizState.answers.push({ ...payload, czy_poprawny: isCorrect });
       if (isCorrect) quizState.correct++;
-      if (quizState.round >= 4) {
+      quizState.round++;
 
+      if (quizState.round > 4) {
         sessionStorage.setItem('quizState', JSON.stringify(quizState));
-        location.href = 'results.html';
-        return;
+        return location.href = 'results.html';
       }
 
-      quizState.round++;
       sessionStorage.setItem('quizState', JSON.stringify(quizState));
       roundEl.textContent = quizState.round;
       msg.textContent = '';
       await loadQuestion();
     } catch (err) {
-      msg.textContent = 'Błąd zapisu: ' + (err && err.toString ? err.toString() : err);
+      msg.textContent = 'Błąd zapisu: ' + err;
       submitBtn.disabled = false;
     }
   });
@@ -159,143 +133,75 @@ if (document.getElementById('answersForm')) {
   loadQuestion();
 }
 
-
-
-if (document.getElementById('score')) {
-  const scoreEl = document.getElementById('score');
+// ========== WYNIKI ==========
+const scoreEl = document.getElementById('score');
+if (scoreEl) {
   const details = document.getElementById('details');
   const retry = document.getElementById('retry');
-  const state = JSON.parse(sessionStorage.getItem('quizState') || '{"round":1,"correct":0,"answers":[]}');
-  const correct = state.correct || 0;
-  scoreEl.textContent = `${correct} / 4`;
+  const state = JSON.parse(sessionStorage.getItem('quizState') || '{"correct":0,"answers":[]}');
 
-  function escapeHtml(s) {
-    if (!s && s !== 0) return '';
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  scoreEl.textContent = `${state.correct || 0} / 4`;
 
   const answers = state.answers || [];
-  if (answers.length === 0) {
+  if (!answers.length) {
     details.textContent = 'Brak szczegółów.';
   } else {
     const table = document.createElement('table');
     table.className = 'results-table';
-
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>#</th><th>Pytanie</th><th>Twoja odpowiedź</th><th>Poprawna</th><th></th></tr>';
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    answers.forEach((a, i) => {
-      const tr = document.createElement('tr');
-
-      const tdIndex = document.createElement('td');
-      tdIndex.className = 'center';
-      tdIndex.textContent = (i + 1);
-
-      const tdQ = document.createElement('td');
-      tdQ.className = 'question-cell';
-      tdQ.textContent = a.pytanie || '';
-
-      const tdYour = document.createElement('td');
-      tdYour.className = 'mono';
-      tdYour.textContent = a.odpowiedz_usera || '-';
-
-      const tdCorrect = document.createElement('td');
-      tdCorrect.className = 'mono';
-      tdCorrect.textContent = a.poprawnaOdp || '-';
-
-      const tdOk = document.createElement('td');
-      tdOk.className = a.czy_poprawny ? 'ok' : 'bad';
-      tdOk.classList.add('center');
-      tdOk.textContent = a.czy_poprawny ? '✓' : '✗';
-
-      tr.appendChild(tdIndex);
-      tr.appendChild(tdQ);
-      tr.appendChild(tdYour);
-      tr.appendChild(tdCorrect);
-      tr.appendChild(tdOk);
-
-      tbody.appendChild(tr);
-    });
-
-    table.appendChild(tbody);
+    table.innerHTML = `
+      <thead><tr><th>#</th><th>Pytanie</th><th>Twoja</th><th>Poprawna</th><th></th></tr></thead>
+      <tbody>
+        ${answers.map((a, i) => `
+          <tr>
+            <td class="center">${i + 1}</td>
+            <td class="question-cell">${a.pytanie || ''}</td>
+            <td class="mono">${a.odpowiedz_usera || '-'}</td>
+            <td class="mono">${a.poprawnaOdp || '-'}</td>
+            <td class="center ${a.czy_poprawny ? 'ok' : 'bad'}">${a.czy_poprawny ? '✓' : '✗'}</td>
+          </tr>`).join('')}
+      </tbody>`;
     details.innerHTML = '';
     details.appendChild(table);
   }
-  retry.addEventListener('click', () => location.href = 'index.html');
 
+  retry.onclick = () => location.href = 'index.html';
   sessionStorage.removeItem('quizState');
   sessionStorage.removeItem('quizCategory');
 }
 
-
-
-if (document.getElementById('historyList')) {
-  const list = document.getElementById('historyList');
+// ========== HISTORIA ==========
+const historyList = document.getElementById('historyList');
+if (historyList) {
   const loading = document.getElementById('loading');
+
+  const pick = (o, keys) => keys.find(k => o?.[k] != null) && o[keys.find(k => o?.[k] != null)];
+
   async function loadHistory() {
     loading.textContent = 'Ładowanie historii...';
     try {
-      const r = await fetch(API.history);
-      if (!r.ok) throw new Error('fetch history fail');
-      const data = await r.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        loading.textContent = 'Brak wpisów w historii.';
-        return;
-      }
-
-      function pick(obj, names) {
-        for (const n of names) {
-          if (obj == null) break;
-          if (Object.prototype.hasOwnProperty.call(obj, n) && obj[n] != null) return obj[n];
-        }
-        return undefined;
-      }
+      const data = await fetchJSON(API.history);
+      if (!Array.isArray(data) || !data.length) return (loading.textContent = 'Brak wpisów.');
 
       loading.remove();
-      data.slice().reverse().forEach(raw => {
-        const when = pick(raw, ['created_at']) || '';
-        const kat = pick(raw, ['kategoria','Kategoria','category','Category']) || '-';
-        const pytanie = pick(raw, ['pytanie','Pytanie','question','Question']) || '';
-        const odpUser = pick(raw, ['odpowiedz_usera','OdpUsera','OdpUsera','OdpUser','OdpUsera'.toString()]) || pick(raw, ['OdpUsera','OdpUser','OdpUsera']) || pick(raw, ['odpowiedzUser','odpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || raw.OdpUsera || raw.OdpUser || raw.odpUser || raw.odpowiedz_usera || raw.OdpUsera || raw.OdpUser || raw.OdpUsera || raw.OdpUser;
-        const poprawna = pick(raw, ['poprawnaOdp','PoprawnaOdp','poprawna_odp','Poprawna_odp']) || '-';
+      data.reverse().forEach(d => {
+        const when = pick(d, ['created_at']) || '';
+        const kat = pick(d, ['kategoria','Kategoria','category']) || '-';
+        const pytanie = pick(d, ['pytanie','Pytanie','question']) || '';
+        const odpUser = pick(d, ['odpowiedz_usera','OdpUsera','OdpUsera','OdpUser','OdpUsera'.toString()]) || pick(raw, ['OdpUsera','OdpUser','OdpUsera']) || pick(raw, ['odpowiedzUser','odpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || raw.OdpUsera || raw.OdpUser || raw.odpUser || raw.odpowiedz_usera || raw.OdpUsera || raw.OdpUser || raw.OdpUsera || raw.OdpUser;
+        const poprawna = pick(d, ['poprawnaOdp','PoprawnaOdp']) || '-';
 
-        const item = document.createElement('li');
-        item.className = 'historyItem';
-
-        const kv = document.createElement('div');
-        kv.className = 'kv';
-        const strong = document.createElement('strong');
-        strong.textContent = when;
-        const span = document.createElement('span');
-        span.className = 'muted';
-        span.textContent = ' | ' + kat;
-        kv.appendChild(strong);
-        kv.appendChild(span);
-
-        const qdiv = document.createElement('div');
-        qdiv.className = 'small';
-        qdiv.textContent = pytanie;
-
-        const info = document.createElement('div');
-        info.className = 'small muted';
-        info.textContent = `twoja: ${odpUser || '-'} • poprawna: ${poprawna}`;
-
-        item.appendChild(kv);
-        item.appendChild(qdiv);
-        item.appendChild(info);
-
-        list.appendChild(item);
+        const li = document.createElement('li');
+        li.className = 'historyItem';
+        li.innerHTML = `
+          <div class="kv"><strong>${when}</strong><span class="muted"> | ${kat}</span></div>
+          <div class="small">${pytanie}</div>
+          <div class="small muted">twoja: ${odpUser} • poprawna: ${poprawna}</div>`;
+        historyList.appendChild(li);
       });
-    } catch (err) {
-      loading.textContent = 'Błąd: ' + err;
+    } catch (e) {
+      loading.textContent = 'Błąd: ' + e;
     }
   }
+
   loadHistory();
 }
