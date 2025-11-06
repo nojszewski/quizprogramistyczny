@@ -1,1 +1,2 @@
-# quizprogramistyczny
+# Quiz programistyczny z AI
+

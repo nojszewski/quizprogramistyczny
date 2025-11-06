@@ -31,7 +31,7 @@ h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    height: 7vh;
 }
 
 .card {
@@ -148,6 +148,40 @@ select {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+/* Styles for results table */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+}
+.results-table thead th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    background: #fafbff;
+    border-bottom: 1px solid #eef2ff;
+}
+.results-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f4f6fb;
+    vertical-align: top;
+}
+.results-table tr:last-child td { border-bottom: none; }
+.results-table .center { text-align: center; width: 40px; }
+.results-table .question-cell { max-width: 520px; }
+.results-table .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; width: 90px; }
+.results-table td.ok { color: #107f46; font-weight: 700; }
+.results-table td.bad { color: #b91c1c; font-weight: 700; }
+
+@media (max-width: 640px) {
+    .results-table thead { display: none; }
+    /* mniejsze odstępy i paddingi dla wierszy w układzie blokowym */
+    .results-table tr { display: block; margin-bottom: 8px; border: 1px solid #f0f2f5; border-radius: 8px; padding: 6px; }
+    .results-table td { display: block; padding: 6px 8px; border-bottom: none; }
+    .results-table .center { text-align: left; }
 }
 
 #indexMain {
