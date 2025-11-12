@@ -1,10 +1,10 @@
 const API = {
-  gen: 'http://100.82.179.61:5678/webhook/generuj-pytanie',
-  save: 'http://100.82.179.61:5678/webhook/zapisz-odpowiedz',
-  history: 'http://100.82.179.61:5678/webhook/pobierz-historie-odpowiedzi'
+  gen: 'http://192.168.222.173:5678/webhook/generuj-pytanie',
+  save: 'http://192.168.222.173:5678/webhook/zapisz-odpowiedz',
+  history: 'http://192.168.222.173:5678/webhook/pobierz-historie-odpowiedzi'
 };
 
-// ========== API ==========
+
 async function fetchJSON(url, options = {}) {
   const r = await fetch(url, options);
   if (!r.ok) throw new Error(`fetch fail: ${r.status}`);
@@ -33,7 +33,7 @@ async function postSave(payload) {
   }).catch(() => null);
 }
 
-// ========== STRONA GŁÓWNA ==========
+
 const catForm = document.getElementById('catForm');
 if (catForm) {
   catForm.addEventListener('submit', e => {
@@ -46,7 +46,8 @@ if (catForm) {
   });
 }
 
-// ========== QUIZ ==========
+
+
 const answersForm = document.getElementById('answersForm');
 if (answersForm) {
   const catTitle = document.getElementById('catTitle');
@@ -54,6 +55,9 @@ if (answersForm) {
   const questionEl = document.getElementById('pytanie');
   const submitBtn = document.getElementById('submitBtn');
   const msg = document.getElementById('msg');
+
+  // Domyślnie chowamy przycisk dopóki pytanie się nie załaduje
+  if (submitBtn) submitBtn.style.display = 'none';
 
   const category = sessionStorage.getItem('quizCategory') || '';
   let quizState = JSON.parse(sessionStorage.getItem('quizState') || '{"round":1,"correct":0,"answers":[]}');
@@ -66,14 +70,20 @@ if (answersForm) {
     msg.textContent = '';
     questionEl.textContent = 'Ładowanie...';
     answersForm.innerHTML = '';
-    submitBtn.disabled = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.style.display = 'none';
+    }
 
     try {
       const data = await fetchQuestion(category);
       const q = (Array.isArray(data) ? data[0] : data).output || data;
       currentQuestion = q;
       renderQuestion(q);
-      submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.style.display = '';
+      }
     } catch {
       questionEl.textContent = 'Błąd pobierania pytania';
     }
@@ -126,14 +136,19 @@ if (answersForm) {
       await loadQuestion();
     } catch (err) {
       msg.textContent = 'Błąd zapisu: ' + err;
-      submitBtn.disabled = false;
+      // Pokaż i odblokuj przycisk tak, by użytkownik mógł spróbować ponownie
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.style.display = '';
+      }
     }
   });
 
   loadQuestion();
 }
 
-// ========== WYNIKI ==========
+
+
 const scoreEl = document.getElementById('score');
 if (scoreEl) {
   const details = document.getElementById('details');
@@ -169,7 +184,8 @@ if (scoreEl) {
   sessionStorage.removeItem('quizCategory');
 }
 
-// ========== HISTORIA ==========
+
+
 const historyList = document.getElementById('historyList');
 if (historyList) {
   const loading = document.getElementById('loading');
