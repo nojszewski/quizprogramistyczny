@@ -1,7 +1,7 @@
 const API = {
-  gen: 'http://192.168.222.173:5678/webhook/generuj-pytanie',
-  save: 'http://192.168.222.173:5678/webhook/zapisz-odpowiedz',
-  history: 'http://192.168.222.173:5678/webhook/pobierz-historie-odpowiedzi'
+  gen: 'http://100.100.200.1:5678/webhook/generuj-pytanie',
+  save: 'http://100.100.200.1:5678/webhook/zapisz-odpowiedz',
+  history: 'http://100.100.200.1:5678/webhook/pobierz-historie-odpowiedzi'
 };
 
 
@@ -54,6 +54,7 @@ if (answersForm) {
   const roundEl = document.getElementById('round');
   const questionEl = document.getElementById('pytanie');
   const submitBtn = document.getElementById('submitBtn');
+  const nextBtn = document.getElementById('nextBtn');
   const msg = document.getElementById('msg');
 
   // Domyślnie chowamy przycisk dopóki pytanie się nie załaduje
@@ -95,13 +96,23 @@ if (answersForm) {
     ['A','B','C','D'].forEach(k => {
       const label = document.createElement('label');
       label.className = 'answer';
-      label.innerHTML = `
-        <input type="radio" name="ans" value="${k}" required>
-        <div>${k}. ${q['odp' + k] || ''}</div>`;
+      
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'ans';
+      input.value = k;
+      input.required = true;
+      
+      const div = document.createElement('div');
+      div.textContent = `${k}. ${q['odp' + k] || ''}`;
+      
+      label.appendChild(input);
+      label.appendChild(div);
       answersForm.appendChild(label);
     });
   }
 
+  // Etap 1: Sprawdzanie odpowiedzi, pokazanie wyniku, odsłonięcie przycisku "Przejdź dalej"
   submitBtn.addEventListener('click', async () => {
     const sel = answersForm.querySelector('input[name="ans"]:checked');
     if (!sel) return (msg.textContent = 'Wybierz odpowiedź');
@@ -109,8 +120,38 @@ if (answersForm) {
     const userAns = sel.value;
     const correct = (currentQuestion.poprawnaOdp || '').toUpperCase();
     const isCorrect = userAns === correct;
-    msg.textContent = 'Zapis...';
-    submitBtn.disabled = true;
+
+    // Zablokuj możliwość zmiany odpowiedzi po sprawdzeniu
+    answersForm.querySelectorAll('input[name="ans"]').forEach(i => i.disabled = true);
+
+    // Podświetlenie odpowiedzi: zaznaczona jako correct/wrong oraz pokaż poprawną
+    const selectedLabel = sel.closest('label');
+    if (selectedLabel) selectedLabel.classList.add('selected');
+    if (isCorrect) {
+      if (selectedLabel) selectedLabel.classList.add('correct');
+    } else {
+      if (selectedLabel) selectedLabel.classList.add('wrong');
+      const correctInput = answersForm.querySelector(`input[name="ans"][value="${correct}"]`);
+      if (correctInput) correctInput.closest('label').classList.add('correct');
+    }
+
+    // Wyświetl wynik w ładnym prostokącie
+    msg.innerHTML = '';
+    const resultBox = document.createElement('div');
+    resultBox.className = `result-box ${isCorrect ? 'success' : 'error'}`;
+    
+    const icon = document.createElement('span');
+    icon.textContent = isCorrect ? '✅' : '❌';
+    
+    const text = document.createElement('span');
+    text.textContent = isCorrect ? 'Poprawna odpowiedź!' : `Niepoprawnie. Poprawna odpowiedź to: ${correct}`;
+    
+    resultBox.appendChild(icon);
+    resultBox.appendChild(text);
+    msg.appendChild(resultBox);
+    
+    submitBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = '';
 
     const payload = {
       ...currentQuestion,
@@ -123,6 +164,15 @@ if (answersForm) {
       await postSave(payload);
       quizState.answers.push({ ...payload, czy_poprawny: isCorrect });
       if (isCorrect) quizState.correct++;
+      sessionStorage.setItem('quizState', JSON.stringify(quizState));
+    } catch (err) {
+      msg.textContent += ` (problem z zapisem: ${err})`;
+    }
+  });
+
+  // Etap 2: Przejście do kolejnego pytania lub wyników
+  if (nextBtn) {
+    nextBtn.addEventListener('click', async () => {
       quizState.round++;
 
       if (quizState.round > 4) {
@@ -132,17 +182,13 @@ if (answersForm) {
 
       sessionStorage.setItem('quizState', JSON.stringify(quizState));
       roundEl.textContent = quizState.round;
-      msg.textContent = '';
+
+      // Przygotowanie do nowego pytania
+      nextBtn.style.display = 'none';
+      submitBtn.style.display = 'none';
       await loadQuestion();
-    } catch (err) {
-      msg.textContent = 'Błąd zapisu: ' + err;
-      // Pokaż i odblokuj przycisk tak, by użytkownik mógł spróbować ponownie
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.style.display = '';
-      }
-    }
-  });
+    });
+  }
 
   loadQuestion();
 }
@@ -205,13 +251,28 @@ if (historyList) {
         const pytanie = pick(d, ['pytanie','Pytanie','question']) || '';
         const odpUser = pick(d, ['odpowiedz_usera','OdpUsera','OdpUsera','OdpUser','OdpUsera'.toString()]) || pick(raw, ['OdpUsera','OdpUser','OdpUsera']) || pick(raw, ['odpowiedzUser','odpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUser']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || pick(raw, ['OdpUsera']) || raw.OdpUsera || raw.OdpUser || raw.odpUser || raw.odpowiedz_usera || raw.OdpUsera || raw.OdpUser || raw.OdpUsera || raw.OdpUser;
         const poprawna = pick(d, ['poprawnaOdp','PoprawnaOdp']) || '-';
+        
+        // Sprawdź czy odpowiedź była poprawna
+        const isCorrect = odpUser && poprawna && odpUser.toUpperCase() === poprawna.toUpperCase();
 
         const li = document.createElement('li');
-        li.className = 'historyItem';
-        li.innerHTML = `
-          <div class="kv"><strong>${when}</strong><span class="muted"> | ${kat}</span></div>
-          <div class="small">${pytanie}</div>
-          <div class="small muted">twoja: ${odpUser} • poprawna: ${poprawna}</div>`;
+        li.className = `historyItem ${isCorrect ? 'correct' : 'incorrect'}`;
+        
+        const kvDiv = document.createElement('div');
+        kvDiv.className = 'kv';
+        kvDiv.innerHTML = `<strong>${when}</strong><span class="muted"> | ${kat}</span>`;
+        
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'small';
+        questionDiv.textContent = pytanie;
+        
+        const answerDiv = document.createElement('div');
+        answerDiv.className = 'small muted';
+        answerDiv.textContent = `twoja: ${odpUser} • poprawna: ${poprawna}`;
+        
+        li.appendChild(kvDiv);
+        li.appendChild(questionDiv);
+        li.appendChild(answerDiv);
         historyList.appendChild(li);
       });
     } catch (e) {

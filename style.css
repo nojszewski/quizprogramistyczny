@@ -127,6 +127,35 @@ select {
 .answer:hover {
     box-shadow: 0 6px 14px rgba(11, 95, 255, 0.06);
 }
+.answer.correct {
+    background: #ecfdf5; /* zielone tło */
+    border-color: #34d399;
+}
+.answer.wrong {
+    background: #fef2f2; /* czerwone tło */
+    border-color: #fca5a5;
+}
+
+.result-box {
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.result-box.success {
+    background: #ecfdf5;
+    border-color: #34d399;
+    color: #065f46;
+}
+.result-box.error {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
 .big {
     font-size: 36px;
     font-weight: 700;
@@ -143,6 +172,14 @@ select {
     border: 1px solid #f0f2f5;
     padding: 12px;
     border-radius: 10px;
+}
+.historyItem.correct {
+    background: #ecfdf5;
+    border-color: #34d399;
+}
+.historyItem.incorrect {
+    background: #fef2f2;
+    border-color: #fca5a5;
 }
 .kv {
     display: flex;
